@@ -1,0 +1,11 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:Carbo Computers
+ORG:Carbo Computers
+TITLE:Tech Solutions
+TEL;TYPE=VOICE,WORK:+17276075303
+EMAIL;TYPE=INTERNET:info@carbocomputers.com
+URL;TYPE=HOMEPAGE:https://www.carbocomputers.com
+ADR;TYPE=WORK:;;8482 85th Court;Seminole;FL;33777;USA
+NOTE:Your Tech Solution Provider
+END:VCARD
