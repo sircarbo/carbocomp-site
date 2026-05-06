@@ -10,10 +10,18 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background-color: #0d0d0d; color: #ffffff; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
     .card { background: #141414; border: 1px solid #1e1e1e; border-radius: 20px; max-width: 420px; width: 100%; padding: 36px 28px; box-shadow: 0 0 40px rgba(0,170,255,0.08); text-align: center; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+    .tab-btn { flex: 1; padding: 11px 8px; border-radius: 10px; border: 1.5px solid #2a2a2a; background: #1a1a1a; color: #888888; font-size: 11px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; cursor: pointer; transition: all 0.2s ease; }
+    .tab-btn.active { background: #00aaff; color: #000000; border-color: #00aaff; }
+    .tab-btn:hover:not(.active) { border-color: #00aaff; color: #00aaff; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
     .qr-section { margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid #1e1e1e; }
     .qr-label { font-size: 11px; color: #00aaff; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; }
-    #qrcode { display: flex; justify-content: center; }
-    #qrcode img, #qrcode canvas { border-radius: 10px; padding: 10px; background: #ffffff; }
+    .qr-sublabel { font-size: 11px; color: #555; margin-top: 12px; letter-spacing: 0.5px; }
+    .qr-box { display: flex; justify-content: center; }
+    .qr-box img, .qr-box canvas { border-radius: 10px; padding: 10px; background: #ffffff; }
+    .review-stars { font-size: 26px; letter-spacing: 3px; margin-bottom: 10px; }
     .logo-wrap { margin-bottom: 20px; }
     .logo-wrap img { width: 140px; height: 140px; object-fit: contain; }
     .company-name { font-size: 24px; font-weight: 700; color: #ffffff; letter-spacing: 1px; margin-bottom: 4px; text-transform: uppercase; }
@@ -33,6 +41,8 @@
     .btn-outline:hover, .btn-outline:active { background: rgba(0,170,255,0.08); transform: translateY(-1px); }
     .btn-ghost { background: #1a1a1a; color: #cccccc; border: 1.5px solid #2a2a2a; }
     .btn-ghost:hover, .btn-ghost:active { background: #222222; transform: translateY(-1px); }
+    .btn-review { background: #1a2a1a; color: #4ade80; border: 1.5px solid #2a4a2a; }
+    .btn-review:hover, .btn-review:active { background: #223322; transform: translateY(-1px); }
     .btn-icon { font-size: 18px; }
     .footer { margin-top: 28px; font-size: 11px; color: #444; }
     .footer a { color: #555; text-decoration: none; }
@@ -40,19 +50,30 @@
 </head>
 <body>
   <div class="card">
-    <div class="qr-section">
-      <p class="qr-label">Scan to add to contacts</p>
-      <div id="qrcode"></div>
-    </div>
     <div class="logo-wrap">
       <img src="logo.png" alt="Carbo Computers Logo" />
     </div>
     <h1 class="company-name">Carbo Computers</h1>
     <p class="tagline">Your Tech Solution</p>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('contact')">📱 Add to Contacts</button>
+      <button class="tab-btn" onclick="switchTab('review')">⭐ Leave a Review</button>
+    </div>
+    <div id="panel-contact" class="qr-section tab-panel active">
+      <p class="qr-label">Scan to add to contacts</p>
+      <div id="qrcode-contact" class="qr-box"></div>
+      <p class="qr-sublabel">Saves directly to your phone's contacts</p>
+    </div>
+    <div id="panel-review" class="qr-section tab-panel">
+      <div class="review-stars">⭐⭐⭐⭐⭐</div>
+      <p class="qr-label">Scan to leave a Google Review</p>
+      <div id="qrcode-review" class="qr-box"></div>
+      <p class="qr-sublabel">Takes 30 seconds — we really appreciate it!</p>
+    </div>
     <div class="info-block">
       <div class="info-item">
         <div class="info-icon">📍</div>
-        <div><div class="info-label">Address</div><div class="info-value">8482 85th Court, Seminole, FL 33777</div></div>
+        <div><div class="info-label">Service Area</div><div class="info-value">Pinellas County, FL &amp; surrounding areas</div></div>
       </div>
       <div class="info-item">
         <div class="info-icon">🕐</div>
@@ -63,19 +84,35 @@
     <div class="actions">
       <a href="tel:+17276075303" class="btn btn-primary"><span class="btn-icon">📞</span> Call (727) 607-5303</a>
       <a href="mailto:info@carbocomputers.com" class="btn btn-outline"><span class="btn-icon">✉️</span> Send an Email</a>
+      <a href="https://g.page/r/CW0BCLMaMft-EBM/review" target="_blank" rel="noopener noreferrer" class="btn btn-review"><span class="btn-icon">⭐</span> Leave a Google Review</a>
       <a href="https://www.carbocomputers.com" target="_blank" rel="noopener noreferrer" class="btn btn-ghost"><span class="btn-icon">🌐</span> Visit Our Website</a>
     </div>
     <p class="footer">© 2026 Carbo Computers · <a href="https://www.carbocomputers.com">carbocomputers.com</a></p>
   </div>
   <script>
-    new QRCode(document.getElementById("qrcode"), {
+    new QRCode(document.getElementById("qrcode-contact"), {
       text: "https://carbocomp.biz/carbo-computers.vcf",
-      width: 160,
-      height: 160,
-      colorDark: "#000000",
-      colorLight: "#ffffff",
+      width: 160, height: 160,
+      colorDark: "#000000", colorLight: "#ffffff",
       correctLevel: QRCode.CorrectLevel.H
     });
+    new QRCode(document.getElementById("qrcode-review"), {
+      text: "https://g.page/r/CW0BCLMaMft-EBM/review",
+      width: 160, height: 160,
+      colorDark: "#000000", colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.H
+    });
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+      if (tab === 'contact') {
+        document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        document.getElementById('panel-contact').classList.add('active');
+      } else {
+        document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        document.getElementById('panel-review').classList.add('active');
+      }
+    }
   </script>
 </body>
 </html>
