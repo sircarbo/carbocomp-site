@@ -144,7 +144,15 @@ body{padding-top:8px}
 @keyframes sweep{from{transform:translateX(-75%)}to{transform:translateX(75%)}}
 @keyframes tap{0%{opacity:0;transform:scale(.6);box-shadow:0 0 0 0 rgb(0 170 255/.5)}15%{opacity:1;transform:scale(1)}100%{opacity:.9;box-shadow:0 0 0 18px rgb(0 170 255/0)}}
 @keyframes pop{from{opacity:0;transform:scale(.4)}}
+
+/* ---- Live circuit-board background: the card is the chip ---- */
+body{position:relative}
+.board{position:absolute;left:0;top:0;width:100%;pointer-events:none;z-index:-1;opacity:0;transition:opacity 1.2s ease}
+.board.on{opacity:1}
+.hint{position:relative;text-shadow:0 1px 3px #070b10,0 0 8px #070b10}
 </style></head><body>
+  <canvas class="board" id="board-base" aria-hidden="true"></canvas>
+  <canvas class="board" id="board-fx" aria-hidden="true"></canvas>
   <!-- Icons: Phosphor Icons (regular, MIT), https://phosphoricons.com -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="i-phone" viewBox="0 0 256 256"><path d="M222.37,158.46l-47.11-21.11-.13-.06a16,16,0,0,0-15.17,1.4,8.12,8.12,0,0,0-.75.56L134.87,160c-15.42-7.49-31.34-23.29-38.83-38.51l20.78-24.71c.2-.25.39-.5.57-.77a16,16,0,0,0,1.32-15.06l0-.12L97.54,33.64a16,16,0,0,0-16.62-9.52A56.26,56.26,0,0,0,32,80c0,79.4,64.6,144,144,144a56.26,56.26,0,0,0,55.88-48.92A16,16,0,0,0,222.37,158.46ZM176,208A128.14,128.14,0,0,1,48,80,40.2,40.2,0,0,1,82.87,40a.61.61,0,0,0,0,.12l21,47L83.2,111.86a6.13,6.13,0,0,0-.57.77,16,16,0,0,0-1,15.7c9.06,18.53,27.73,37.06,46.46,46.11a16,16,0,0,0,15.75-1.14,8.44,8.44,0,0,0,.74-.56L168.89,152l47,21.05h0s.08,0,.11,0A40.21,40.21,0,0,1,176,208Z"/></symbol>
@@ -271,6 +279,116 @@ body{padding-top:8px}
       el.addEventListener('pointerleave',function(){el.classList.remove('lit');});
       el.addEventListener('pointerup',function(e){if(e.pointerType!=='mouse')setTimeout(function(){el.classList.remove('lit');},350);});
     });
+  })();
+  </script>
+  <script>
+  // Live circuit-board background. Traces grow out of the card (the "chip");
+  // pulses of light run along them. Static board only under reduced motion.
+  (function(){
+    var base=document.getElementById('board-base'), fx=document.getElementById('board-fx');
+    var stage=document.querySelector('.stage');
+    var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var DIRS=[[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
+    var C=8, traces=[], pulses=[], W=0, H=0, dpr=1, raf=0, last=0, nextSurge=0, cx=0, cy=0;
+
+    function rnd(a,b){return a+Math.random()*(b-a);}
+    function ri(a,b){return Math.floor(rnd(a,b+1));}
+    function absRect(el){var x=0,y=0,e=el;while(e){x+=e.offsetLeft;y+=e.offsetTop;e=e.offsetParent;}return{x:x,y:y,w:el.offsetWidth,h:el.offsetHeight};}
+
+    function build(){
+      W=document.documentElement.clientWidth; H=Math.max(document.documentElement.scrollHeight,innerHeight);
+      dpr=Math.min(window.devicePixelRatio||1,2);
+      [base,fx].forEach(function(c){c.width=W*dpr;c.height=H*dpr;c.style.height=H+'px';});
+      var cols=Math.ceil(W/C)+1, rows=Math.ceil(H/C)+1, grid=new Uint8Array(cols*rows);
+      function occ(i,j){return i<0||j<0||i>=cols||j>=rows||grid[j*cols+i];}
+      function mark(i,j){grid[j*cols+i]=1;}
+      var r=absRect(stage); cx=r.x+r.w/2; cy=r.y+r.h/2;
+      var ci0=Math.floor(r.x/C)-1, ci1=Math.ceil((r.x+r.w)/C)+1, cj0=Math.floor(r.y/C)-1, cj1=Math.ceil((r.y+r.h)/C)+1;
+      for(var j=cj0;j<=cj1;j++)for(var i=ci0;i<=ci1;i++)if(!occ(i,j))mark(i,j);
+      traces=[];
+      function grow(i,j,d0,maxLen,bundle){
+        var d=d0, pts=[[i*C,j*C]], len=0, seg=bundle?bundle.seg[0]:ri(3,9), k=0, n=0;
+        mark(i,j);
+        while(len<maxLen){
+          if(n>=seg){ // bend 45 degrees, never back toward the chip
+            var turn=bundle?bundle.turn[k%bundle.turn.length]:(Math.random()<.5?-1:1);
+            var nd=(d+turn+8)%8, diff=Math.min((nd-d0+8)%8,(d0-nd+8)%8);
+            if(diff<=1) d=nd; else d=d0;
+            k++; seg=bundle?bundle.seg[k%bundle.seg.length]:ri(3,10); n=0; pts.push([i*C,j*C]);
+          }
+          var ni=i+DIRS[d][0], nj=j+DIRS[d][1];
+          if(occ(ni,nj)|| (DIRS[d][0]&&DIRS[d][1]&&(occ(ni,j)&&occ(i,nj)))) break;
+          i=ni;j=nj;mark(i,j);n++;len++;
+        }
+        pts.push([i*C,j*C]);
+        if(len<3) return null;
+        var L=[0],tot=0;for(var q=1;q<pts.length;q++){tot+=Math.hypot(pts[q][0]-pts[q-1][0],pts[q][1]-pts[q-1][1]);L.push(tot);}
+        return {pts:pts,L:L,len:tot};
+      }
+      function edge(list,d0){ // bundles of parallel traces leaving one side of the card
+        for(var s=0;s<list.length;){
+          var size=ri(3,6), b={seg:[ri(2,6),ri(4,10),ri(3,9),ri(5,12)],turn:[Math.random()<.5?-1:1,Math.random()<.5?-1:1,Math.random()<.5?-1:1]};
+          for(var q=0;q<size&&s<list.length;q++,s++){var t=grow(list[s][0],list[s][1],d0,ri(40,140),b); if(t){t.main=1;traces.push(t);}}
+        }
+      }
+      var top=[],bot=[],lef=[],rig=[];
+      for(var i2=ci0+1;i2<ci1;i2+=2){top.push([i2,cj0-1]);bot.push([i2,cj1+1]);}
+      for(var j2=cj0+1;j2<cj1;j2+=2){lef.push([ci0-1,j2]);rig.push([ci1+1,j2]);}
+      edge(top,6);edge(bot,2);edge(lef,4);edge(rig,0);
+      var fill=Math.round(W*H/2600); // filler traces for board density
+      for(var f=0;f<fill;f++){var fi=ri(0,cols-1),fj=ri(0,rows-1);if(!occ(fi,fj)){var t2=grow(fi,fj,ri(0,7),ri(4,24));if(t2)traces.push(t2);}}
+      // Draw the static board once.
+      var g=base.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+      var bg=g.createRadialGradient(cx,cy,0,cx,cy,Math.max(W,H)*.9);
+      bg.addColorStop(0,'#0b1c2b');bg.addColorStop(.55,'#08111a');bg.addColorStop(1,'#05080c');
+      g.fillStyle=bg;g.fillRect(0,0,W,H);
+      g.lineCap='round';g.lineJoin='round';
+      traces.forEach(function(t){
+        g.strokeStyle=t.main?'rgba(0,150,230,.30)':'rgba(0,110,180,.20)'; g.lineWidth=t.main?1.5:1.1;
+        g.beginPath();g.moveTo(t.pts[0][0],t.pts[0][1]);for(var q=1;q<t.pts.length;q++)g.lineTo(t.pts[q][0],t.pts[q][1]);g.stroke();
+        var e=t.pts[t.pts.length-1]; g.beginPath();g.arc(e[0],e[1],t.main?2.6:1.8,0,6.283);g.stroke();
+      });
+      for(var s2=0;s2<fill/3;s2++){var sx=ri(0,cols-1),sy=ri(0,rows-1);if(!occ(sx,sy)&&!occ(sx+1,sy)){g.fillStyle='rgba(30,80,120,.35)';g.fillRect(sx*C-3,sy*C-1.5,Math.random()<.5?7:4,3);}}
+    }
+
+    function at(t,s){var q=1;while(q<t.L.length-1&&t.L[q]<s)q++;var a=t.pts[q-1],b=t.pts[q],seg=(t.L[q]-t.L[q-1])||1,k=Math.max(0,Math.min(1,(s-t.L[q-1])/seg));return[a[0]+(b[0]-a[0])*k,a[1]+(b[1]-a[1])*k];}
+    var mains=function(){return traces.filter(function(t){return t.main;});};
+    function spawn(n,fast){var m=mains();for(var i=0;i<n&&m.length;i++){var t=m[ri(0,m.length-1)];pulses.push({t:t,s:0,v:fast?rnd(420,620):rnd(220,380),len:rnd(34,70),flash:0});}}
+
+    function frame(now){
+      raf=requestAnimationFrame(frame);
+      var dt=Math.min(.05,(now-(last||now))/1000); last=now;
+      if(now>nextSurge){spawn(ri(10,16),true);nextSurge=now+rnd(2600,4200);}
+      if(pulses.length<22&&Math.random()<.35)spawn(1);
+      var g=fx.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+      g.globalCompositeOperation='lighter'; g.lineCap='round';
+      for(var i=pulses.length-1;i>=0;i--){
+        var p=pulses[i]; p.s+=p.v*dt;
+        if(p.s-p.len>p.t.len){ if(p.flash>.3){pulses.splice(i,1);continue;} p.flash+=dt; var e=p.t.pts[p.t.pts.length-1];
+          g.fillStyle='rgba(0,170,255,'+(.5*(1-p.flash/.3))+')'; g.beginPath();g.arc(e[0],e[1],5,0,6.283);g.fill(); continue; }
+        var h=at(p.t,Math.min(p.s,p.t.len)), tl=at(p.t,Math.max(0,p.s-p.len));
+        var grad=g.createLinearGradient(tl[0],tl[1],h[0],h[1]);
+        grad.addColorStop(0,'rgba(0,170,255,0)');grad.addColorStop(1,'rgba(150,225,255,.95)');
+        g.beginPath(); var a=Math.max(0,p.s-p.len), b=Math.min(p.s,p.t.len); var st=at(p.t,a); g.moveTo(st[0],st[1]);
+        for(var q=1;q<p.t.L.length;q++){ if(p.t.L[q]>a&&p.t.L[q]<b) g.lineTo(p.t.pts[q][0],p.t.pts[q][1]); }
+        g.lineTo(h[0],h[1]);
+        g.strokeStyle='rgba(0,170,255,.16)';g.lineWidth=6;g.stroke();
+        g.strokeStyle=grad;g.lineWidth=1.8;g.stroke();
+      }
+    }
+
+    function start(){
+      build(); base.classList.add('on');
+      if(reduce) return;
+      fx.classList.add('on'); cancelAnimationFrame(raf); last=0; nextSurge=performance.now()+300; raf=requestAnimationFrame(frame);
+    }
+    document.addEventListener('visibilitychange',function(){ if(reduce) return;
+      if(document.hidden){cancelAnimationFrame(raf);} else {last=0;raf=requestAnimationFrame(frame);} });
+    var lastW=0, tmr=0;
+    addEventListener('resize',function(){ if(document.documentElement.clientWidth===lastW) return; clearTimeout(tmr);
+      tmr=setTimeout(function(){lastW=document.documentElement.clientWidth;pulses=[];start();},200); });
+    // Board powers on after the card's own traces finish drawing.
+    addEventListener('load',function(){ lastW=document.documentElement.clientWidth; setTimeout(start, reduce?0:1600); });
   })();
   </script>
 </body></html>
